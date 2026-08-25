@@ -13,6 +13,7 @@ A learning monorepo — **one folder = one React design pattern project**.
 | Project | Pattern | Run from root |
 |---------|---------|---------------|
 | [layout-component](./layout-component) | Layout Components | `npm run dev:layout` |
+| [container-components](./container-components) | Container Components | `npm run dev:container` |
 
 ---
 
@@ -52,9 +53,14 @@ npm run dev
 |------|---------|
 | Install all projects | `npm install` (from root) |
 | Run layout project | `npm run dev:layout` |
+| Run container project | `npm run dev:container` |
 | Build layout project | `npm run build:layout` |
+| Build container project | `npm run build:container` |
 | Lint layout project | `npm run lint:layout` |
+| Lint container project | `npm run lint:container` |
 | Stop the server | `Ctrl + C` |
+
+For **container-components**, also start the mock API (`node server.js` in that folder) — see [container-components/README.md](./container-components/README.md).
 
 You can run multiple projects at once. Vite will pick the next free port (5173, 5174, …).
 
@@ -263,8 +269,9 @@ design-patterns-desing-systems/     ← repo root (git + workspaces)
 ├── package-lock.json
 ├── README.md                       ← this file
 ├── .gitignore
-├── layout-component/               ← project 1
-└── compound-component/             ← project 2 (example)
+├── layout-component/               ← project 1 — layout / list / modal
+├── container-components/           ← project 2 — container / presentational
+└── compound-component/             ← project 3 (example)
 ```
 
 Each project is independent and has its own `package.json`, `src/`, and Vite config.
