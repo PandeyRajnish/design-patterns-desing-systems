@@ -5,10 +5,16 @@ import { DataSource } from "./components/data-source";
 import { ResourceLoader } from "./components/resource-loader";
 import { UserInfo } from "./components/user-info";
 import { UserLoader } from "./components/user-loader";
+import { DataSourceWithRender } from "./components/data-source-with-render";
 
 const getDataFromServer = async (url) => {
   const response = await axios.get(url);
   return response.data;
+};
+
+const fetchData = async (url) => {
+  const response = await fetch(url);
+  return response.json();
 };
 
 function App() {
@@ -56,6 +62,14 @@ function App() {
       >
         <UserInfo />
       </DataSource>
+
+      {/* data source */}
+      <h2>Data Source with Render Promps pattern</h2>
+      <hr />
+      <DataSourceWithRender
+        getData={() => fetchData("/users/2")}
+        render={(resource) => <UserInfo user={resource} />}
+      ></DataSourceWithRender>
     </>
   );
 }

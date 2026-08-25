@@ -11,6 +11,7 @@ Use this README when you revise — it documents what you built, why it works, a
 | Pattern | Idea | Example here |
 |---------|------|--------------|
 | **Container Component** | Owns data fetching + prop injection; does not own UI markup | `CurrentUserLoader`, `UserLoader`, `ResourceLoader`, `DataSource` |
+| **Render Props** | Parent passes a `render(data)` function; container calls it with loaded data | `DataSourceWithRender` |
 | **Presentational Component** | Owns how data looks; does not know where it came from | `UserInfo`, `BookInfo` |
 | **Dev proxy** | Vite forwards API paths to Express so the browser stays same-origin | `vite.config.js` |
 
@@ -20,6 +21,7 @@ Shared theme: **separate data from presentation**.
 - Presentational = markup for one resource
 - `server.js` = fake REST API
 - `children` + `cloneElement` = inject data without hard-wiring one child type
+- `render(resource)` = same idea as cloneElement, but you wire props yourself in a function
 
 Mix any container with any matching presentational child.
 
@@ -39,7 +41,8 @@ container-components/
         ├── current-user-loader.jsx    ← container: GET /current-user → injects `user`
         ├── user-loader.jsx            ← container: GET /users/:id → injects `user`
         ├── resource-loader.jsx        ← container: any URL + prop name
-        ├── data-source.jsx            ← container: any getData() + prop name
+        ├── data-source.jsx            ← container: any getData() + prop name (cloneElement)
+        ├── data-source-with-render.jsx← container: any getData() + render prop
         ├── user-info.jsx              ← presentational: user
         └── book-info.jsx              ← presentational: book
 ```
@@ -53,7 +56,8 @@ container-components/
 | 1 | `CurrentUserLoader` | `GET /current-user` | `UserInfo` |
 | 2 | `UserLoader` | `GET /users/:userId` (ids 1, 2, 3) | `UserInfo` |
 | 3 | `ResourceLoader` | `/users/2` + `/books/2` | `UserInfo` / `BookInfo` |
-| 4 | `DataSource` | `getDataFromServer("/users/2")` | `UserInfo` |
+| 4 | `DataSource` | `getDataFromServer("/users/2")` (axios) | `UserInfo` via children |
+| 5 | `DataSourceWithRender` | `fetchData("/users/2")` (fetch) | `UserInfo` via `render` |
 
 ---
 
@@ -208,18 +212,88 @@ Most flexible: you pass **how** to load, not **where**.
 
 Container calls `await getData()` in `useEffect` and injects `{ [resourceName]: data }`. It does not know about URLs or axios.
 
+In `App.jsx`, `getDataFromServer` uses **axios**.
+
+---
+
+## 5. `DataSourceWithRender` (container + render props) — **new**
+
+Same data-loading idea as `DataSource`, but instead of `children` + `cloneElement`, the parent passes a **`render` function**. The container loads data, then calls `render(resource)`.
+
+### Why render props?
+
+| Approach | How UI gets data | Who maps prop names |
+|----------|------------------|---------------------|
+| `DataSource` | `children` + `cloneElement({ [resourceName]: data })` | Container (needs `resourceName`) |
+| `DataSourceWithRender` | `render(resource)` returns JSX | Parent (you write `user={resource}` yourself) |
+
+No `Children` / `isValidElement` / `cloneElement`. More explicit; easier when one resource drives custom JSX (multiple components, conditionals, etc.).
+
+### API
+
+```jsx
+<DataSourceWithRender
+  getData={() => fetchData("/users/2")}
+  render={(resource) => <UserInfo user={resource} />}
+/>
+```
+
+| Prop | Meaning |
+|------|---------|
+| `getData` | Async function that returns the resource |
+| `render` | `(resource) => ReactNode` — called with loaded data (or `null` while loading) |
+
+### How it works
+
+```jsx
+export const DataSourceWithRender = ({ getData = () => {}, render }) => {
+  const [resource, setResource] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const data = await getData();
+      setResource(data);
+    })();
+  }, [getData]);
+
+  return render(resource);
+};
+```
+
+1. Same fetch loop as `DataSource` (`useEffect` + `getData`)
+2. Return value is whatever `render(resource)` returns
+3. While `resource` is `null`, `UserInfo` still shows **Loading...** (because you pass `user={null}`)
+
+### `DataSource` vs `DataSourceWithRender`
+
+```jsx
+{/* cloneElement — container picks the prop name */}
+<DataSource getData={...} resourceName="user">
+  <UserInfo />
+</DataSource>
+
+{/* render prop — you pick the prop name in the function */}
+<DataSourceWithRender
+  getData={...}
+  render={(resource) => <UserInfo user={resource} />}
+/>
+```
+
+In `App.jsx`, this demo uses **`fetch`** (`fetchData`) instead of axios — proves `getData` can be any async source.
+
 ### Container progression
 
 ```text
-CurrentUserLoader  →  one fixed endpoint
-UserLoader         →  one resource type, by id
-ResourceLoader     →  any URL + prop name
-DataSource         →  any data function + prop name
+CurrentUserLoader       →  one fixed endpoint
+UserLoader              →  one resource type, by id
+ResourceLoader          →  any URL + prop name
+DataSource              →  any getData() + children / cloneElement
+DataSourceWithRender    →  any getData() + render(resource)
 ```
 
 ---
 
-## 5. Presentational components
+## 6. Presentational components
 
 They only care about props. No `fetch`, no `axios`, no URL knowledge.
 
@@ -253,7 +327,7 @@ Both treat a missing prop as “not ready.” Containers mount children immediat
 
 ---
 
-## 6. Mock API (`server.js`)
+## 7. Mock API (`server.js`)
 
 In-memory Express server so containers practice real HTTP.
 
@@ -272,7 +346,7 @@ Default port: **3000**.
 
 ---
 
-## 7. Vite proxy (`vite.config.js`)
+## 8. Vite proxy (`vite.config.js`)
 
 Vite (e.g. `:5173`) and Express (`:3000`) are different origins. Without a proxy or CORS, browser requests to `/current-user` would hit Vite and 404.
 
@@ -305,25 +379,28 @@ Containers keep relative URLs. Both processes must be running.
 ## Mental model (revise this)
 
 ```
-server.js              →  fake backend
-vite proxy             →  same-origin paths during dev
-CurrentUserLoader      →  fetch /current-user; inject `user`
-UserLoader             →  fetch /users/:id; inject `user`
-ResourceLoader         →  fetch any URL; inject [resourceName]
-DataSource             →  call any getData(); inject [resourceName]
-UserInfo / BookInfo    →  how one resource looks
-Children.map + clone   →  inject props without importing a specific child
-App.jsx                →  compose containers + presentational demos
+server.js                 →  fake backend
+vite proxy                →  same-origin paths during dev
+CurrentUserLoader         →  fetch /current-user; inject `user`
+UserLoader                →  fetch /users/:id; inject `user`
+ResourceLoader            →  fetch any URL; inject [resourceName]
+DataSource                →  getData() + cloneElement([resourceName])
+DataSourceWithRender      →  getData() + render(resource)
+UserInfo / BookInfo       →  how one resource looks
+Children.map + clone      →  inject props without importing a specific child
+render(resource)          →  parent wires props explicitly
+App.jsx                   →  compose containers + presentational demos
 ```
 
 You can freely recombine:
 
 ```text
-CurrentUserLoader  + UserInfo
-UserLoader(id)     + UserInfo
-ResourceLoader     + UserInfo or BookInfo
-DataSource         + UserInfo or BookInfo
-Same UserInfo      + different containers
+CurrentUserLoader        + UserInfo
+UserLoader(id)           + UserInfo
+ResourceLoader           + UserInfo or BookInfo
+DataSource               + UserInfo or BookInfo
+DataSourceWithRender     + any JSX via render(...)
+Same UserInfo            + different containers / patterns
 ```
 
 ---
@@ -358,7 +435,7 @@ npm run dev
 
 Usually http://localhost:5173 (or the next free port if layout is already running).
 
-You should briefly see **Loading...**, then all four demo sections with user/book data.
+You should briefly see **Loading...**, then all five demo sections with user/book data.
 
 ---
 
@@ -382,11 +459,18 @@ You should briefly see **Loading...**, then all four demo sections with user/boo
 - [ ] Try `/users/1`, `/books/3` — prove one loader handles both types
 - [ ] Trace `{ [resourceName]: resource }` until it clicks
 
-### DataSource — **new**
+### DataSource
 
-- [x] Load via `getData()` function
+- [x] Load via `getData()` function (axios in App)
 - [ ] Swap `getData` to a non-HTTP source (e.g. `() => Promise.resolve({...})`)
 - [ ] Watch `getData` in `useEffect` deps — inline arrow re-runs every render (use `useCallback` in parent if needed)
+
+### DataSourceWithRender — **new**
+
+- [x] Load via `getData` + `render(resource)` (fetch in App)
+- [ ] Compare side-by-side with `DataSource` — same data, different wiring
+- [ ] Try richer render: e.g. `render={(r) => r ? <UserInfo user={r} /> : <p>…</p>}`
+- [ ] Optional: rename prop to `children` as a function (`children(resource)`) — same pattern
 
 ### Presentational
 
