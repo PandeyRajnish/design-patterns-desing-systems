@@ -1,80 +1,49 @@
 # Layout Component
 
-Learning project for the **Layout Component** pattern: reusable wrappers that own structure and spacing, while content stays in the parent.
+Learning project for reusable React patterns: **Layout Components** and **List Components**.
+
+Use this README when you revise — it documents what you built, why, and what to try next.
 
 ---
 
-## Pattern idea (revise later)
+## Patterns covered
 
-A layout component:
+| Pattern | Idea | Example here |
+|---------|------|--------------|
+| **Layout Component** | Owns arrangement (flex/ratios); does not own content | `SplitScreen` |
+| **List Component** | Owns iteration + prop wiring; does not own how each row looks | `RegularList` |
 
-- Controls **how** things are arranged (rows, columns, ratios)
-- Does **not** care about the content itself
-- Accepts children (or component props) and places them in slots
-
-Benefit: the same layout can wrap any UI without rewriting flex/grid each time.
-
----
-
-## What’s in this project
-
-| File                              | Role                                      |
-| --------------------------------- | ----------------------------------------- |
-| `src/components/split-screen.jsx` | Reusable two-panel layout                 |
-| `src/App.jsx`                     | Demo usage with sample left/right content |
+Shared theme: **separate structure from presentation**. Layout/list = structure. Item/content components = presentation.
 
 ---
 
-## `SplitScreen`
+## Folder map
 
-Two-panel horizontal layout using flexbox + `styled-components`.
+```
+src/
+├── App.jsx                          ← demos both patterns
+├── components/
+│   ├── split-screen.jsx             ← Layout: two-panel flex
+│   ├── lists/
+│   │   └── Regular.jsx              ← List: map items → ItemComponent
+│   ├── authors/
+│   │   ├── SmallListItems.jsx       ← compact author row
+│   │   └── LargeListItems.jsx       ← detailed author block
+│   └── books/
+│       ├── SmallListItems.jsx       ← (stub — not wired yet)
+│       └── LargeListItems.jsx       ← (stub — not wired yet)
+└── data/
+    ├── authors.js                   ← author seed data
+    └── books.js                     ← book seed data
+```
+
+---
+
+## 1. `SplitScreen` (layout)
+
+Two-panel horizontal layout via flex + `styled-components`.
 
 ### API
-
-```jsx
-<SplitScreen leftWidth={1} rightWidth={3}>
-  <LeftContent />
-  <RightContent />
-</SplitScreen>
-```
-
-| Prop         | Default  | Meaning                                   |
-| ------------ | -------- | ----------------------------------------- |
-| `children`   | required | Exactly **two** children: `[left, right]` |
-| `leftWidth`  | `1`      | Flex grow for the left panel              |
-| `rightWidth` | `1`      | Flex grow for the right panel             |
-
-Widths are **ratios**, not pixels.  
-`leftWidth={1}` + `rightWidth={3}` → left takes ~25%, right ~75%.
-
-### How it works
-
-1. Destructure the first two children: `const [left, right] = children`
-2. Wrap each in a `Panel` with `flex: leftWidth` / `flex: rightWidth`
-3. Parent `Container` is `display: flex`
-
-```jsx
-export const SplitScreen = ({ children, leftWidth = 1, rightWidth = 1 }) => {
-  const [left, right] = children;
-  return (
-    <Container>
-      <Panel flex={leftWidth}>{left}</Panel>
-      <Panel flex={rightWidth}>{right}</Panel>
-    </Container>
-  );
-};
-```
-
-### Styled pieces
-
-- `Container` — flex row
-- `Panel` — `flex: ${(props) => props.flex}` so each side scales by ratio
-
----
-
-## How `App.jsx` uses it
-
-Demo content is defined as small components, then passed as children:
 
 ```jsx
 <SplitScreen leftWidth={1} rightWidth={3}>
@@ -83,44 +52,123 @@ Demo content is defined as small components, then passed as children:
 </SplitScreen>
 ```
 
-Notes for revision:
+| Prop | Default | Meaning |
+|------|---------|---------|
+| `children` | required | Exactly **two** children: `[left, right]` |
+| `leftWidth` | `1` | Flex grow (ratio) for left |
+| `rightWidth` | `1` | Flex grow (ratio) for right |
 
-- Content components (`LeftSideComp`, `RightSideComp`) know nothing about the layout
-- Layout (`SplitScreen`) knows nothing about the titles/colors
-- Props like `title` stay on the content; layout only receives width ratios
+`1` + `3` → left ~25%, right ~75%. Ratios, not pixels.
+
+### How it works
+
+```jsx
+const [left, right] = children;
+// Panel flex={leftWidth} | Panel flex={rightWidth}
+```
+
+Content components never import layout styles. Layout never knows about titles/colors.
 
 ---
 
-## Design choices to remember
+## 2. `RegularList` (list)
 
-### Children API (current)
+Generic list: you pass **data**, a **prop name**, and an **item component**. The list maps and injects each item under that prop name.
 
-```jsx
-<SplitScreen>
-  <A />
-  <B />
-</SplitScreen>
-```
-
-Pros: natural JSX, easy to pass props into `A` / `B`.  
-Cons: assumes exactly two children; order matters.
-
-### Alternative: component props (not used here)
+### API
 
 ```jsx
-<SplitScreen left={Left} right={Right} />
+<RegularList
+  items={authors}
+  sourceName="author"
+  ItemComponent={SmallAuthorListItem}
+/>
 ```
 
-Pros: named slots, clearer intent.  
-Cons: harder to pass props unless you use `left={<Left title="..." />}` or render-prop style.
+| Prop | Meaning |
+|------|---------|
+| `items` | Array of data objects |
+| `sourceName` | Prop name each item receives (e.g. `"author"` → `{ author: item }`) |
+| `ItemComponent` | Component that renders one row |
 
-When revising, compare both and pick what feels clearer for your use case.
+### How it works (important)
+
+```jsx
+{items.map((item, i) => (
+  <ItemComponent key={i} {...{ [sourceName]: item }} />
+))}
+```
+
+`{ [sourceName]: item }` is a **computed property name**. If `sourceName="author"`, each child gets `author={item}`.
+
+That is why item components look like:
+
+```jsx
+export const SmallAuthorListItem = ({ author }) => { ... }
+export const LargeAuthorListItem = ({ author }) => { ... }
+```
+
+Same list, different `ItemComponent` → small vs large UI without changing the list.
+
+### Demo in `App.jsx`
+
+```jsx
+<RegularList items={authors} sourceName="author" ItemComponent={SmallAuthorListItem} />
+<RegularList items={authors} sourceName="author" ItemComponent={LargeAuthorListItem} />
+```
+
+Same `authors` data, two densities.
+
+---
+
+## 3. Item components & data
+
+### Authors (implemented)
+
+| Component | Shows |
+|-----------|--------|
+| `SmallAuthorListItem` | name, age |
+| `LargeAuthorListItem` | name, age, country, books list |
+
+Data shape (`data/authors.js`):
+
+```js
+{ name, age, country, books: string[] }
+```
+
+### Books (prepared, not used in App yet)
+
+| File | Status |
+|------|--------|
+| `data/books.js` | Seed data present |
+| `books/SmallListItems.jsx` | Empty stub |
+| `books/LargeListItems.jsx` | Empty stub |
+
+Next step when revising: mirror the author pattern with `sourceName="book"` and wire them in `App.jsx`.
+
+---
+
+## Why this design (revise notes)
+
+1. **List does not know authors vs books** — only `items` + `sourceName` + `ItemComponent`.
+2. **Item does not know it is in a list** — it only expects one prop (`author` / later `book`).
+3. **Small vs Large** swap is one prop change, not a rewrite of the map.
+4. **Layout (`SplitScreen`) and list (`RegularList`) are independent** — you can nest lists inside panels later if you want.
+
+### Mental model
+
+```
+RegularList          →  how many / how to pass data
+ItemComponent        →  how one item looks
+data/*.js            →  what the data is
+SplitScreen          →  how regions are sized (separate concern)
+```
 
 ---
 
 ## Run
 
-From the **repo root**:
+From repo root:
 
 ```bash
 npm run dev:layout
@@ -132,22 +180,30 @@ From this folder:
 npm run dev
 ```
 
-Open the URL Vite prints (usually http://localhost:5173).
+Usually http://localhost:5173.
 
 ---
 
-## Quick revise checklist
+## Revise checklist
 
-- [ ] Re-read why layout and content are separated
-- [ ] Change `leftWidth` / `rightWidth` and watch the ratio change
-- [ ] Swap the two children — confirm order = left/right
-- [ ] Try a third child — note that only the first two are used today
-- [ ] Optional: refactor to `left` / `right` props and compare DX
-- [ ] Optional: add more layout variants (stack, sidebar, grid) in `src/components/`
+### SplitScreen
+
+- [ ] Change `leftWidth` / `rightWidth` and confirm ratios
+- [ ] Swap the two children — order = left/right
+- [ ] Optional: try `left` / `right` props instead of children
+
+### RegularList
+
+- [ ] Switch `ItemComponent` between Small and Large — same data, different UI
+- [ ] Trace `{ [sourceName]: item }` until it clicks
+- [ ] Implement `SmallBookListItem` / `LargeBookListItem`
+- [ ] Add a books `RegularList` in `App.jsx` with `sourceName="book"`
+- [ ] Optional: put a `RegularList` inside a `SplitScreen` panel
+- [ ] Optional: prefer stable keys (`item.name`) over index `i`
 
 ---
 
 ## Stack
 
 - React + Vite
-- styled-components
+- styled-components (used by `SplitScreen`)
