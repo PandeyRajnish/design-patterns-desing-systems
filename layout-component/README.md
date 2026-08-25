@@ -1,6 +1,6 @@
 # Layout Component
 
-Learning project for reusable React patterns: **Layout Components** and **List Components**.
+Learning project for reusable React patterns: **Layout**, **List**, and **Modal** components.
 
 Use this README when you revise — it documents what you built, why it works, and what to try next.
 
@@ -8,18 +8,19 @@ Use this README when you revise — it documents what you built, why it works, a
 
 ## Patterns covered
 
-| Pattern              | Idea                                              | Example here                  |
-| -------------------- | ------------------------------------------------- | ----------------------------- |
-| **Layout Component** | Owns arrangement; does not own content            | `SplitScreen`                 |
-| **List Component**   | Owns iteration + prop wiring; does not own row UI | `RegularList`, `NumberedList` |
+| Pattern | Idea | Example here |
+|---------|------|--------------|
+| **Layout Component** | Owns arrangement; does not own content | `SplitScreen` |
+| **List Component** | Owns iteration + prop wiring; does not own row UI | `RegularList`, `NumberedList` |
+| **Modal (Uncontrolled)** | Owns open/close + overlay chrome; does not own body content | `Modal` |
 
 Shared theme: **separate structure from presentation**.
 
-- Layout / list = structure
-- Item components = presentation
+- Layout / list / modal = structure & behavior shell
+- Item / children = presentation
 - `data/*` = raw data
 
-Mix any list style with any item style and any dataset.
+Mix any shell with any content.
 
 ---
 
@@ -30,6 +31,7 @@ src/
 ├── App.jsx                            ← all demos wired together
 ├── components/
 │   ├── split-screen.jsx               ← Layout: two-panel flex
+│   ├── Modal.jsx                      ← Overlay shell + show/hide state
 │   ├── lists/
 │   │   ├── Regular.jsx                ← plain mapped list
 │   │   └── Numbered.jsx               ← same API + index heading
@@ -48,17 +50,18 @@ src/
 
 ## What’s demoed in `App.jsx`
 
-| #   | Component      | Data    | Item UI                    |
-| --- | -------------- | ------- | -------------------------- |
-| 1   | `SplitScreen`  | —       | Left / Right demo headings |
-| 2   | `RegularList`  | authors | Small author               |
-| 3   | `NumberedList` | authors | Large author               |
-| 4   | `RegularList`  | authors | Large author               |
-| 5   | `RegularList`  | books   | Small book                 |
-| 6   | `NumberedList` | books   | Large book                 |
-| 7   | `RegularList`  | books   | Large book                 |
+| # | Component | Data | Content |
+|---|-----------|------|---------|
+| 1 | `SplitScreen` | — | Left / Right demo headings |
+| 2 | `Modal` | `books[0]` | `LargeBookListItem` inside overlay |
+| 3 | `RegularList` | authors | Small author |
+| 4 | `NumberedList` | authors | Large author |
+| 5 | `RegularList` | authors | Large author |
+| 6 | `RegularList` | books | Small book |
+| 7 | `NumberedList` | books | Large book |
+| 8 | `RegularList` | books | Large book |
 
-Same lists, different data and item components — that is the whole point.
+Same idea everywhere: shell owns structure; children own what you see.
 
 ---
 
@@ -88,7 +91,92 @@ const [left, right] = children;
 
 ---
 
-## 2. List components
+## 2. `Modal` (layout / overlay)
+
+Reusable overlay shell. It owns **visibility** and **chrome** (backdrop, panel, buttons). It does **not** own what appears inside — that is `children`.
+
+### API
+
+```jsx
+<Modal>
+  <LargeBookListItem book={books[0]} />
+</Modal>
+```
+
+| Prop | Meaning |
+|------|---------|
+| `children` | Any React node shown inside the modal panel |
+
+Demo in `App.jsx` passes an existing item component — no special modal-only UI required.
+
+### How it works
+
+1. Internal state: `const [show, setShow] = useState(false)`
+2. Always render a **Show Modal** button
+3. When `show` is true, render:
+   - `ModalBackground` — full-area dimmed overlay; click closes
+   - `ModalContent` — centered panel; click uses `stopPropagation` so it does not close
+   - **Hide Modal** button + `{children}`
+
+```jsx
+export const Modal = ({ children }) => {
+  const [show, setShow] = useState(false);
+
+  return (
+    <>
+      <button onClick={() => setShow(true)}>Show Modal</button>
+      {show && (
+        <ModalBackground onClick={() => setShow(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShow(false)}>Hide Modal</button>
+            {children}
+          </ModalContent>
+        </ModalBackground>
+      )}
+    </>
+  );
+};
+```
+
+### Styled pieces
+
+| Piece | Role |
+|-------|------|
+| `ModalBackground` | Absolute full size, semi-transparent black, click-to-close |
+| `ModalContent` | Wheat panel, ~50% width, padding, holds children |
+
+### Why `stopPropagation` matters
+
+Without it, a click inside the panel bubbles to `ModalBackground` and closes the modal immediately. Stopping propagation on `ModalContent` keeps the panel interactive while the backdrop still closes on outside click.
+
+### Uncontrolled vs controlled (revise later)
+
+| Style | Who owns `show`? | This project |
+|-------|------------------|--------------|
+| **Uncontrolled** | Modal’s own `useState` | Current |
+| **Controlled** | Parent via `isOpen` / `onClose` props | Optional next step |
+
+Current design is great for demos. Controlled is better when the parent must open the modal from elsewhere (e.g. a list row click).
+
+### Reuse idea
+
+Because content is just `children`, you can drop in anything:
+
+```jsx
+<Modal>
+  <LargeAuthorListItem author={authors[0]} />
+</Modal>
+
+<Modal>
+  <RegularList items={books} sourceName="book" ItemComponent={SmallBookListItem} />
+</Modal>
+```
+
+Same shell, different bodies — same pattern as `SplitScreen` and the lists.
+
+---
+
+## 3. List components
 
 Both lists share the **same API**:
 
@@ -156,7 +244,7 @@ That is why item components declare:
 
 ---
 
-## 3. Item components
+## 4. Item components
 
 ### Authors (`sourceName="author"`)
 
@@ -194,19 +282,23 @@ Note: in this dataset, `title` is used as the author name (e.g. `"Harper Lee"`).
 
 ```
 SplitScreen     →  how regions are sized
+Modal           →  overlay shell + open/close (uncontrolled)
 RegularList     →  iterate, no numbers
 NumberedList    →  iterate + show 1, 2, 3…
 ItemComponent   →  how one row looks (Small / Large)
 sourceName      →  which prop name the item expects
+children        →  what Modal / SplitScreen display
 data/*.js       →  the raw arrays
 ```
 
 You can freely recombine:
 
 ```text
+Modal        + LargeBookListItem
 NumberedList + books + SmallBookListItem
 RegularList  + authors + LargeAuthorListItem
 SplitScreen  + any lists inside each panel
+Modal        + RegularList inside the panel
 ```
 
 ---
@@ -231,6 +323,16 @@ Usually http://localhost:5173.
 
 ## Revise checklist
 
+### Modal
+
+- [ ] Open / close via buttons; confirm backdrop click closes
+- [ ] Click inside the panel — should stay open (`stopPropagation`)
+- [ ] Swap children to `LargeAuthorListItem` or a list — prove content is reusable
+- [ ] Try `position: fixed` on the backdrop (vs `absolute`) if scroll/cover feels wrong
+- [ ] Optional: controlled API — `isOpen` + `onClose` from the parent
+- [ ] Optional: close on `Escape`; trap focus inside the panel
+- [ ] Optional: render via a portal (`createPortal`) to avoid stacking-context bugs
+
 ### Layout
 
 - [ ] Change `leftWidth` / `rightWidth` and confirm ratios
@@ -252,7 +354,6 @@ Usually http://localhost:5173.
 ### Optional next patterns
 
 - [ ] Extract a shared base list and pass `renderItem` / children
-- [ ] Modal / overlay layout component
 - [ ] Compound components for tabs or accordions
 
 ---
@@ -260,4 +361,4 @@ Usually http://localhost:5173.
 ## Stack
 
 - React + Vite
-- styled-components (used by `SplitScreen`)
+- styled-components (used by `SplitScreen` and `Modal`)

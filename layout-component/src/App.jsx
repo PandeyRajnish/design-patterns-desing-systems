@@ -7,6 +7,7 @@ import { books } from "./data/books";
 import { SmallBookListItem } from "./components/books/SmallListItems";
 import { LargeBookListItem } from "./components/books/LargeListItems";
 import { NumberedList } from "./components/lists/Numbered";
+import { Modal } from "./components/Modal";
 
 const LeftSideComp = ({ title }) => {
   return <h2 style={{ backgroundColor: "crimson" }}>{title}</h2>;
@@ -23,6 +24,10 @@ function App() {
         <LeftSideComp title="Left!" />
         <RightSideComp title="Right!" />
       </SplitScreen>
+
+      <Modal>
+        <LargeBookListItem book={books[0]} />
+      </Modal>
 
       <RegularList
         items={authors}
