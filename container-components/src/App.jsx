@@ -17,6 +17,12 @@ const fetchData = async (url) => {
   return response.json();
 };
 
+const getDataFromLocalStorage = (key) => {
+  return localStorage.getItem(key);
+};
+
+const Message = ({ msg }) => <h1>{msg}</h1>;
+
 function App() {
   return (
     <>
@@ -70,6 +76,16 @@ function App() {
         getData={() => fetchData("/users/2")}
         render={(resource) => <UserInfo user={resource} />}
       ></DataSourceWithRender>
+
+      {/* data source  load the data from the local storage*/}
+      <h2>Load the data from the local Storage</h2>
+      <hr />
+      <DataSource
+        getData={() => getDataFromLocalStorage("test")}
+        resourceName={"msg"}
+      >
+        <Message />
+      </DataSource>
     </>
   );
 }

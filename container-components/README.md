@@ -22,6 +22,7 @@ Shared theme: **separate data from presentation**.
 - `server.js` = fake REST API
 - `children` + `cloneElement` = inject data without hard-wiring one child type
 - `render(resource)` = same idea as cloneElement, but you wire props yourself in a function
+- `getData` = swap the *source* (axios, fetch, localStorage) without changing the container
 
 Mix any container with any matching presentational child.
 
@@ -58,6 +59,7 @@ container-components/
 | 3 | `ResourceLoader` | `/users/2` + `/books/2` | `UserInfo` / `BookInfo` |
 | 4 | `DataSource` | `getDataFromServer("/users/2")` (axios) | `UserInfo` via children |
 | 5 | `DataSourceWithRender` | `fetchData("/users/2")` (fetch) | `UserInfo` via `render` |
+| 6 | `DataSource` | `getDataFromLocalStorage("test")` | `Message` (`msg` prop) |
 
 ---
 
@@ -214,6 +216,40 @@ Container calls `await getData()` in `useEffect` and injects `{ [resourceName]: 
 
 In `App.jsx`, `getDataFromServer` uses **axios**.
 
+### Same container, non-HTTP source (localStorage) — **new**
+
+`DataSource` does not care *where* data comes from. The second demo in `App.jsx` proves that with **localStorage**:
+
+```jsx
+const getDataFromLocalStorage = (key) => {
+  return localStorage.getItem(key);
+};
+
+const Message = ({ msg }) => <h1>{msg}</h1>;
+
+<DataSource
+  getData={() => getDataFromLocalStorage("test")}
+  resourceName="msg"
+>
+  <Message />
+</DataSource>
+```
+
+| Piece | Role |
+|-------|------|
+| `getDataFromLocalStorage("test")` | Reads `localStorage` key `"test"` (sync is fine — container still `await`s it) |
+| `resourceName="msg"` | Injects `{ msg: "…" }` into the child |
+| `Message` | Tiny presentational component — only displays `msg` |
+
+**Why this matters:** one container (`DataSource`) can feed:
+
+| `getData` | `resourceName` | Child |
+|-----------|----------------|-------|
+| axios → `/users/2` | `"user"` | `UserInfo` |
+| `localStorage.getItem("test")` | `"msg"` | `Message` |
+
+Same inject pattern (`cloneElement`). No server required for this demo — but you must set the key first (e.g. in DevTools: `localStorage.setItem("test", "Hello from localStorage")`). If the key is missing, `msg` is `null` and `Message` renders an empty heading.
+
 ---
 
 ## 5. `DataSourceWithRender` (container + render props) — **new**
@@ -288,8 +324,19 @@ CurrentUserLoader       →  one fixed endpoint
 UserLoader              →  one resource type, by id
 ResourceLoader          →  any URL + prop name
 DataSource              →  any getData() + children / cloneElement
+                         (axios, fetch-shaped helpers, localStorage, …)
 DataSourceWithRender    →  any getData() + render(resource)
 ```
+
+### `getData` helpers in `App.jsx`
+
+| Helper | Source | Used by |
+|--------|--------|---------|
+| `getDataFromServer(url)` | axios | `DataSource` → `UserInfo` |
+| `fetchData(url)` | `fetch` | `DataSourceWithRender` → `UserInfo` |
+| `getDataFromLocalStorage(key)` | `localStorage` | `DataSource` → `Message` |
+
+All three plug into the same container idea: **pass a function, get data back**.
 
 ---
 
@@ -320,6 +367,18 @@ Shows name, age, country, and a books list. If `user` is missing → **Loading..
 | `book` | `{ name, price, title, pages }` — or falsy while loading |
 
 Shows name, price, title (author in this dataset), and page count. If `book` is missing → **Loading...**.
+
+### `Message` (App.jsx helper) — **new**
+
+```jsx
+const Message = ({ msg }) => <h1>{msg}</h1>;
+```
+
+| Prop | Meaning |
+|------|---------|
+| `msg` | String from localStorage (via `DataSource` + `resourceName="msg"`) |
+
+Not a separate file — lives in `App.jsx` to show that **any** presentational child works with `DataSource`, not only `UserInfo` / `BookInfo`.
 
 ### Why “Loading...” lives in the presentational layer
 
@@ -385,8 +444,10 @@ CurrentUserLoader         →  fetch /current-user; inject `user`
 UserLoader                →  fetch /users/:id; inject `user`
 ResourceLoader            →  fetch any URL; inject [resourceName]
 DataSource                →  getData() + cloneElement([resourceName])
+                             (HTTP *or* localStorage — same container)
 DataSourceWithRender      →  getData() + render(resource)
 UserInfo / BookInfo       →  how one resource looks
+Message                   →  tiny presentational demo for localStorage `msg`
 Children.map + clone      →  inject props without importing a specific child
 render(resource)          →  parent wires props explicitly
 App.jsx                   →  compose containers + presentational demos
@@ -398,9 +459,10 @@ You can freely recombine:
 CurrentUserLoader        + UserInfo
 UserLoader(id)           + UserInfo
 ResourceLoader           + UserInfo or BookInfo
-DataSource               + UserInfo or BookInfo
+DataSource               + UserInfo or BookInfo or Message
 DataSourceWithRender     + any JSX via render(...)
 Same UserInfo            + different containers / patterns
+getData                  + axios | fetch | localStorage | anything
 ```
 
 ---
@@ -435,7 +497,15 @@ npm run dev
 
 Usually http://localhost:5173 (or the next free port if layout is already running).
 
-You should briefly see **Loading...**, then all five demo sections with user/book data.
+You should briefly see **Loading...**, then all six demo sections (HTTP users/books + localStorage message if the key is set).
+
+**localStorage tip:** before the last demo shows text, run in the browser console:
+
+```js
+localStorage.setItem("test", "Hello from localStorage");
+```
+
+Then refresh.
 
 ---
 
@@ -462,7 +532,8 @@ You should briefly see **Loading...**, then all five demo sections with user/boo
 ### DataSource
 
 - [x] Load via `getData()` function (axios in App)
-- [ ] Swap `getData` to a non-HTTP source (e.g. `() => Promise.resolve({...})`)
+- [x] Non-HTTP source: `localStorage` → `Message` with `resourceName="msg"`
+- [ ] Try another key / JSON (`JSON.parse(localStorage.getItem(...))`) if you store objects
 - [ ] Watch `getData` in `useEffect` deps — inline arrow re-runs every render (use `useCallback` in parent if needed)
 
 ### DataSourceWithRender — **new**
@@ -471,11 +542,13 @@ You should briefly see **Loading...**, then all five demo sections with user/boo
 - [ ] Compare side-by-side with `DataSource` — same data, different wiring
 - [ ] Try richer render: e.g. `render={(r) => r ? <UserInfo user={r} /> : <p>…</p>}`
 - [ ] Optional: rename prop to `children` as a function (`children(resource)`) — same pattern
+- [ ] Optional: point `getData` at localStorage too (prove render props work offline)
 
 ### Presentational
 
 - [ ] Confirm falsy `user` / `book` shows **Loading...**
 - [ ] Guard `books.map` if `books` can be missing
+- [ ] Confirm `Message` shows after `localStorage.setItem("test", "…")`
 
 ### Server & proxy
 
