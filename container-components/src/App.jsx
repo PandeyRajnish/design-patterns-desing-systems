@@ -1,7 +1,12 @@
+import { CurrentUserLoader } from "./components/current-user-loader";
+import { UserInfo } from "./components/user-info";
+
 function App() {
   return (
     <>
-      <h1>Container Components</h1>
+      <CurrentUserLoader>
+        <UserInfo />
+      </CurrentUserLoader>
     </>
   );
 }
