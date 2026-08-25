@@ -6,6 +6,89 @@ Use this README when you revise — it documents what you built, why it works, a
 
 ---
 
+## Which pattern should I use? (real project guide)
+
+Use this when you hit a data/UI problem at work. Start at the top and stop at the first match.
+
+### Quick decision tree
+
+```text
+Need to arrange UI only (split panels, lists, modal shell)?
+  → layout-component patterns (SplitScreen / List / Modal) — not this folder
+
+Need to load data and show UI?
+  │
+  ├─ Same endpoint everywhere (e.g. “current user” / session)?
+  │    → CurrentUserLoader
+  │
+  ├─ Same resource type, different ids (user/1, user/2…)?
+  │    → UserLoader (or BookLoader-style dedicated loader)
+  │
+  ├─ Many REST URLs, same “GET + inject prop” shape?
+  │    → ResourceLoader
+  │
+  ├─ Source is not always HTTP (API + localStorage + GraphQL + mock)?
+  │    │
+  │    ├─ Child is a normal component; prop name is fixed → DataSource
+  │    └─ Need custom JSX / multiple children / conditionals → DataSourceWithRender
+  │
+  └─ Team already uses React Query / SWR / Redux Toolkit Query?
+       → Prefer those for server state in production; keep presentational components
+```
+
+### Pattern → when (company-style scenarios)
+
+| Use this | When (real product situations) | Avoid when |
+|----------|--------------------------------|------------|
+| **Presentational** (`UserInfo`, `BookInfo`, `Message`) | Design system cards, storybook, same UI in admin + mobile web, A/B UI swap | It starts calling APIs itself |
+| **`CurrentUserLoader`** | Navbar avatar, “me” page, permissions gate, billing “signed-in as” | You need arbitrary user ids (use `UserLoader`) |
+| **`UserLoader`** | Profile by route id (`/users/:id`), team member drawer, support “impersonate user” | Many resource types share one loader shape (use `ResourceLoader`) |
+| **`ResourceLoader`** | CRUD screens that only differ by URL + prop (`/orders/5`, `/books/2`) | Non-HTTP sources or complex fetch (auth headers, retries, cache) |
+| **`DataSource`** | Feature needs **swappable sources**: REST today, localStorage draft tomorrow, MSW in tests | You need fine-grained control of markup while loading/error (prefer render props or hooks) |
+| **`DataSourceWithRender`** | Dashboard widgets, “if null show empty state else detail”, compose 2+ components from one fetch | Simple one-child cases where `DataSource` + `resourceName` is enough |
+| **localStorage via `getData`** | Theme preference, “don’t show again”, draft forms, offline banner copy | Large datasets or secrets (use a proper store / backend) |
+
+### How companies usually evolve this
+
+What you built here is the classic teaching path. In larger codebases it often becomes:
+
+| Stage | What teams do | Maps to this repo |
+|-------|---------------|-------------------|
+| 1 | Dedicated loaders per feature | `CurrentUserLoader`, `UserLoader` |
+| 2 | Generic HTTP loader | `ResourceLoader` |
+| 3 | Inject `getData` / adapters | `DataSource` |
+| 4 | Render props or hooks for flexibility | `DataSourceWithRender` → later `useUser()`, `useQuery()` |
+| 5 | Shared server-state library | React Query / SWR / RTK Query (production default) |
+
+**Practical rule for interviews / code reviews:**
+
+- Keep **UI dumb** (presentational) always — that stays valuable.
+- Prefer **one clear loader** early; go generic only when you copy-paste the third similar loader.
+- Prefer **hooks** (`useCurrentUser`) over `cloneElement` containers in new greenfield apps — same separation, clearer data flow.
+- Prefer **React Query / SWR** when you need cache, retries, stale-while-revalidate, shared fetches across pages.
+- Still use **container-style wrappers** for auth gates, layout shells that must wait on session, or when teaching / migrating legacy class code.
+
+### Cheat sheet (one line each)
+
+| Pattern | One-liner |
+|---------|-----------|
+| `CurrentUserLoader` | “Always the logged-in user.” |
+| `UserLoader` | “This user id from the URL.” |
+| `ResourceLoader` | “Any REST GET → any prop name.” |
+| `DataSource` | “Any function → inject a named prop.” |
+| `DataSourceWithRender` | “Any function → you decide the JSX.” |
+| Presentational | “Just render props — no fetching.” |
+
+### With layout-component (same monorepo)
+
+| Need | Project / pattern |
+|------|-------------------|
+| How it looks / is arranged | `layout-component` → `SplitScreen`, lists, `Modal` |
+| Where data comes from | `container-components` → loaders / `DataSource` |
+| Both | Compose: e.g. `Modal` + `UserLoader` + `UserInfo`, or `SplitScreen` with a loader in each panel |
+
+---
+
 ## Patterns covered
 
 | Pattern | Idea | Example here |
