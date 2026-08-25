@@ -2,18 +2,24 @@
 
 Learning project for reusable React patterns: **Layout Components** and **List Components**.
 
-Use this README when you revise — it documents what you built, why, and what to try next.
+Use this README when you revise — it documents what you built, why it works, and what to try next.
 
 ---
 
 ## Patterns covered
 
-| Pattern | Idea | Example here |
-|---------|------|--------------|
-| **Layout Component** | Owns arrangement (flex/ratios); does not own content | `SplitScreen` |
-| **List Component** | Owns iteration + prop wiring; does not own how each row looks | `RegularList` |
+| Pattern              | Idea                                              | Example here                  |
+| -------------------- | ------------------------------------------------- | ----------------------------- |
+| **Layout Component** | Owns arrangement; does not own content            | `SplitScreen`                 |
+| **List Component**   | Owns iteration + prop wiring; does not own row UI | `RegularList`, `NumberedList` |
 
-Shared theme: **separate structure from presentation**. Layout/list = structure. Item/content components = presentation.
+Shared theme: **separate structure from presentation**.
+
+- Layout / list = structure
+- Item components = presentation
+- `data/*` = raw data
+
+Mix any list style with any item style and any dataset.
 
 ---
 
@@ -21,29 +27,44 @@ Shared theme: **separate structure from presentation**. Layout/list = structure.
 
 ```
 src/
-├── App.jsx                          ← demos both patterns
+├── App.jsx                            ← all demos wired together
 ├── components/
-│   ├── split-screen.jsx             ← Layout: two-panel flex
+│   ├── split-screen.jsx               ← Layout: two-panel flex
 │   ├── lists/
-│   │   └── Regular.jsx              ← List: map items → ItemComponent
+│   │   ├── Regular.jsx                ← plain mapped list
+│   │   └── Numbered.jsx               ← same API + index heading
 │   ├── authors/
-│   │   ├── SmallListItems.jsx       ← compact author row
-│   │   └── LargeListItems.jsx       ← detailed author block
+│   │   ├── SmallListItems.jsx         ← compact author row
+│   │   └── LargeListItems.jsx         ← detailed author block
 │   └── books/
-│       ├── SmallListItems.jsx       ← (stub — not wired yet)
-│       └── LargeListItems.jsx       ← (stub — not wired yet)
+│       ├── SmallListItems.jsx         ← compact book row
+│       └── LargeListItems.jsx         ← detailed book block
 └── data/
-    ├── authors.js                   ← author seed data
-    └── books.js                     ← book seed data
+    ├── authors.js
+    └── books.js
 ```
+
+---
+
+## What’s demoed in `App.jsx`
+
+| #   | Component      | Data    | Item UI                    |
+| --- | -------------- | ------- | -------------------------- |
+| 1   | `SplitScreen`  | —       | Left / Right demo headings |
+| 2   | `RegularList`  | authors | Small author               |
+| 3   | `NumberedList` | authors | Large author               |
+| 4   | `RegularList`  | authors | Large author               |
+| 5   | `RegularList`  | books   | Small book                 |
+| 6   | `NumberedList` | books   | Large book                 |
+| 7   | `RegularList`  | books   | Large book                 |
+
+Same lists, different data and item components — that is the whole point.
 
 ---
 
 ## 1. `SplitScreen` (layout)
 
 Two-panel horizontal layout via flex + `styled-components`.
-
-### API
 
 ```jsx
 <SplitScreen leftWidth={1} rightWidth={3}>
@@ -52,30 +73,24 @@ Two-panel horizontal layout via flex + `styled-components`.
 </SplitScreen>
 ```
 
-| Prop | Default | Meaning |
-|------|---------|---------|
-| `children` | required | Exactly **two** children: `[left, right]` |
-| `leftWidth` | `1` | Flex grow (ratio) for left |
-| `rightWidth` | `1` | Flex grow (ratio) for right |
+| Prop         | Default  | Meaning                                   |
+| ------------ | -------- | ----------------------------------------- |
+| `children`   | required | Exactly **two** children: `[left, right]` |
+| `leftWidth`  | `1`      | Flex grow (ratio) for left                |
+| `rightWidth` | `1`      | Flex grow (ratio) for right               |
 
 `1` + `3` → left ~25%, right ~75%. Ratios, not pixels.
-
-### How it works
 
 ```jsx
 const [left, right] = children;
 // Panel flex={leftWidth} | Panel flex={rightWidth}
 ```
 
-Content components never import layout styles. Layout never knows about titles/colors.
-
 ---
 
-## 2. `RegularList` (list)
+## 2. List components
 
-Generic list: you pass **data**, a **prop name**, and an **item component**. The list maps and injects each item under that prop name.
-
-### API
+Both lists share the **same API**:
 
 ```jsx
 <RegularList
@@ -83,51 +98,71 @@ Generic list: you pass **data**, a **prop name**, and an **item component**. The
   sourceName="author"
   ItemComponent={SmallAuthorListItem}
 />
+
+<NumberedList
+  items={books}
+  sourceName="book"
+  ItemComponent={LargeBookListItem}
+/>
 ```
 
-| Prop | Meaning |
-|------|---------|
-| `items` | Array of data objects |
-| `sourceName` | Prop name each item receives (e.g. `"author"` → `{ author: item }`) |
-| `ItemComponent` | Component that renders one row |
+| Prop            | Meaning                                               |
+| --------------- | ----------------------------------------------------- |
+| `items`         | Array of data objects                                 |
+| `sourceName`    | Prop name each item receives (`"author"` or `"book"`) |
+| `ItemComponent` | Component that renders one row                        |
 
-### How it works (important)
+### `RegularList`
+
+Maps items → `ItemComponent` only.
 
 ```jsx
-{items.map((item, i) => (
-  <ItemComponent key={i} {...{ [sourceName]: item }} />
-))}
+{
+  items.map((item, i) => <ItemComponent key={i} {...{ [sourceName]: item }} />);
+}
 ```
 
-`{ [sourceName]: item }` is a **computed property name**. If `sourceName="author"`, each child gets `author={item}`.
+### `NumberedList`
 
-That is why item components look like:
+Same wiring, plus a visible index (`i + 1`) above each item.
 
 ```jsx
-export const SmallAuthorListItem = ({ author }) => { ... }
-export const LargeAuthorListItem = ({ author }) => { ... }
+{
+  items.map((item, i) => (
+    <>
+      <h3>{i + 1}</h3>
+      <ItemComponent key={i} {...{ [sourceName]: item }} />
+    </>
+  ));
+}
 ```
 
-Same list, different `ItemComponent` → small vs large UI without changing the list.
+Difference to remember: **list style** (plain vs numbered) is independent of **item style** (small vs large) and **data type** (authors vs books).
 
-### Demo in `App.jsx`
+### The `sourceName` trick
+
+```js
+{ ...{ [sourceName]: item } }
+```
+
+Computed property name. If `sourceName="author"`, each child gets `author={item}`. If `"book"`, each child gets `book={item}`.
+
+That is why item components declare:
 
 ```jsx
-<RegularList items={authors} sourceName="author" ItemComponent={SmallAuthorListItem} />
-<RegularList items={authors} sourceName="author" ItemComponent={LargeAuthorListItem} />
+({ author }) => { ... }   // authors
+({ book }) => { ... }     // books
 ```
-
-Same `authors` data, two densities.
 
 ---
 
-## 3. Item components & data
+## 3. Item components
 
-### Authors (implemented)
+### Authors (`sourceName="author"`)
 
-| Component | Shows |
-|-----------|--------|
-| `SmallAuthorListItem` | name, age |
+| Component             | Shows                          |
+| --------------------- | ------------------------------ |
+| `SmallAuthorListItem` | name, age                      |
 | `LargeAuthorListItem` | name, age, country, books list |
 
 Data shape (`data/authors.js`):
@@ -136,32 +171,42 @@ Data shape (`data/authors.js`):
 { name, age, country, books: string[] }
 ```
 
-### Books (prepared, not used in App yet)
+### Books (`sourceName="book"`)
 
-| File | Status |
-|------|--------|
-| `data/books.js` | Seed data present |
-| `books/SmallListItems.jsx` | Empty stub |
-| `books/LargeListItems.jsx` | Empty stub |
+| Component           | Shows                              |
+| ------------------- | ---------------------------------- |
+| `SmallBookListItem` | name / price                       |
+| `LargeBookListItem` | name, price, title (author), pages |
 
-Next step when revising: mirror the author pattern with `sourceName="book"` and wire them in `App.jsx`.
+Data shape (`data/books.js`):
+
+```js
+{
+  (name, pages, title, price);
+}
+```
+
+Note: in this dataset, `title` is used as the author name (e.g. `"Harper Lee"`). Worth cleaning up when you revise.
 
 ---
 
-## Why this design (revise notes)
-
-1. **List does not know authors vs books** — only `items` + `sourceName` + `ItemComponent`.
-2. **Item does not know it is in a list** — it only expects one prop (`author` / later `book`).
-3. **Small vs Large** swap is one prop change, not a rewrite of the map.
-4. **Layout (`SplitScreen`) and list (`RegularList`) are independent** — you can nest lists inside panels later if you want.
-
-### Mental model
+## Mental model (revise this)
 
 ```
-RegularList          →  how many / how to pass data
-ItemComponent        →  how one item looks
-data/*.js            →  what the data is
-SplitScreen          →  how regions are sized (separate concern)
+SplitScreen     →  how regions are sized
+RegularList     →  iterate, no numbers
+NumberedList    →  iterate + show 1, 2, 3…
+ItemComponent   →  how one row looks (Small / Large)
+sourceName      →  which prop name the item expects
+data/*.js       →  the raw arrays
+```
+
+You can freely recombine:
+
+```text
+NumberedList + books + SmallBookListItem
+RegularList  + authors + LargeAuthorListItem
+SplitScreen  + any lists inside each panel
 ```
 
 ---
@@ -186,20 +231,29 @@ Usually http://localhost:5173.
 
 ## Revise checklist
 
-### SplitScreen
+### Layout
 
 - [ ] Change `leftWidth` / `rightWidth` and confirm ratios
-- [ ] Swap the two children — order = left/right
-- [ ] Optional: try `left` / `right` props instead of children
+- [ ] Nest a `RegularList` or `NumberedList` inside a `SplitScreen` panel
 
-### RegularList
+### Lists
 
-- [ ] Switch `ItemComponent` between Small and Large — same data, different UI
+- [ ] Swap `RegularList` ↔ `NumberedList` without changing item components
 - [ ] Trace `{ [sourceName]: item }` until it clicks
-- [ ] Implement `SmallBookListItem` / `LargeBookListItem`
-- [ ] Add a books `RegularList` in `App.jsx` with `sourceName="book"`
-- [ ] Optional: put a `RegularList` inside a `SplitScreen` panel
-- [ ] Optional: prefer stable keys (`item.name`) over index `i`
+- [ ] Fix `NumberedList` fragment key warning (put `key` on the outer fragment / wrapper)
+- [ ] Prefer stable keys (`item.name`) over index when data allows
+
+### Data & items
+
+- [ ] Diversify `books.js` entries (they are currently duplicates)
+- [ ] Rename book fields if `title` vs author feels confusing
+- [ ] Add a third density (e.g. medium) and plug it into either list
+
+### Optional next patterns
+
+- [ ] Extract a shared base list and pass `renderItem` / children
+- [ ] Modal / overlay layout component
+- [ ] Compound components for tabs or accordions
 
 ---
 
