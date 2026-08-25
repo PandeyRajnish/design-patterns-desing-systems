@@ -2,11 +2,15 @@
   "name": "design-patterns-design-systems",
   "private": true,
   "workspaces": [
-    "layout-component"
+    "layout-component",
+    "container-component"
   ],
   "scripts": {
     "dev:layout": "npm run dev -w layout-component",
     "build:layout": "npm run build -w layout-component",
-    "lint:layout": "npm run lint -w layout-component"
+    "lint:layout": "npm run lint -w layout-component",
+    "dev:container": "npm run dev -w container-component",
+    "build:container": "npm run build -w container-component",
+    "lint:container": "npm run lint -w container-component"
   }
 }
