@@ -63,7 +63,7 @@ app.get("/current-user", (req, res) => {
   res.json(currentUser);
 });
 
-app.get("/user/:id", (req, res) => {
+app.get("/users/:id", (req, res) => {
   const { id } = req.params;
 
   console.log(id);
@@ -86,7 +86,7 @@ app.get("/books", (req, res) => {
   res.json(books);
 });
 
-app.get("/book/:id", (req, res) => {
+app.get("/books/:id", (req, res) => {
   const { id } = req.params;
 
   res.json(books.find((book) => book.id === id));
